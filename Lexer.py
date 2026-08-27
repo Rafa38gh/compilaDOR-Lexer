@@ -80,7 +80,62 @@ class Lexer:
 
     def __init__(self, source: str):
         self.source = source
-        # TODO: inicialize aqui o estado exigido por sua estratégia.
+        
+        self.pos = 0
+        self.line = 1
+        self.column = 1
+    
+    def _peek(self, offset: int = 0) -> str:
+        """Lê caractere sem consumir"""
+        i = self.pos + offset
+        return self.source[i] if i < len(self.source) else ''
+
+    def _advance(self) -> str:
+        """Consome e retorna o caractere atual"""
+        char = self.source[self.pos]
+        self.pos += 1
+        
+        if char == '\n':
+            self.line += 1
+            self.column = 1
+        else:
+            self.column += 1
+        
+        return char
+    
+    def _end(self) -> bool:
+        return self.pos >= len(self.source)
+    
+    def _skip_space(self) -> None:
+        """Pula espaço, tab, quebra de linha e comentários"""
+        while not self._end():
+            char = self._peek()
+
+            if char in (' ', '\t', '\n'):       # Espaço, tab e quebra de linha
+                self._advance()
+                continue
+
+            if char == '/' and self._peek(1) == '/':        # Comentário de linha
+                while not self._end() and self._peek() != '\n':
+                    self._advance()
+                continue
+
+            if char == '/' and self._peek(1) == '*':        # Comentário de bloco
+                start_line, start_column = self.line, self.column
+                self._advance()
+                self._advance()
+
+                while True:
+                    if self._end():
+                        raise LexerError("Sem término no comentário de bloco", start_line, start_column)
+                    
+                    if self._peek() == '*' and self._peek(1) == '/':
+                        self._advance()
+                        self._advance()
+                        break
+                    self._advance()
+                continue
+            break
 
     def tokens(self) -> Iterator[Token]:
         """Produza todos os tokens significativos e um único EOF ao final."""
