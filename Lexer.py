@@ -139,9 +139,123 @@ class Lexer:
 
     def tokens(self) -> Iterator[Token]:
         """Produza todos os tokens significativos e um único EOF ao final."""
-        raise NotImplementedError("implemente o analisador léxico")
-        yield  # mantém este método como gerador durante o desenvolvimento
+        # Dicionário para facilitar a identificação de palavras-chave
+        keywords = {
+            "int": TokenKind.KW_INT, "bool": TokenKind.KW_BOOL, "void": TokenKind.KW_VOID,
+            "true": TokenKind.KW_TRUE, "false": TokenKind.KW_FALSE, "if": TokenKind.KW_IF,
+            "else": TokenKind.KW_ELSE, "while": TokenKind.KW_WHILE, "return": TokenKind.KW_RETURN,
+            "print": TokenKind.KW_PRINT
+        }
+
+        # Dicionário para operadores de caractere único
+        single_chars = {
+            '+': TokenKind.PLUS, '-': TokenKind.MINUS, '*': TokenKind.STAR,
+            '/': TokenKind.SLASH, '%': TokenKind.PERCENT, '(': TokenKind.LEFT_PAREN,
+            ')': TokenKind.RIGHT_PAREN, '{': TokenKind.LEFT_BRACE, '}': TokenKind.RIGHT_BRACE,
+            ',': TokenKind.COMMA, ';': TokenKind.SEMICOLON
+        }
+
+        while True:
+            self._skip_space()
+            
+            start_line = self.line
+            start_column = self.column
+            
+            if self._end():
+                yield Token(TokenKind.EOF, "", None, start_line, start_column)
+                break
+                
+            char = self._advance()
+            
+            # --- 1. Operadores de 1 ou 2 caracteres ---
+            if char == '=':
+                if self._peek() == '=':
+                    self._advance()
+                    yield Token(TokenKind.EQUAL_EQUAL, "==", None, start_line, start_column)
+                else:
+                    yield Token(TokenKind.ASSIGN, "=", None, start_line, start_column)
+                continue
+                
+            if char == '<':
+                if self._peek() == '=':
+                    self._advance()
+                    yield Token(TokenKind.LESS_EQUAL, "<=", None, start_line, start_column)
+                else:
+                    yield Token(TokenKind.LESS, "<", None, start_line, start_column)
+                continue
+                
+            if char == '>':
+                if self._peek() == '=':
+                    self._advance()
+                    yield Token(TokenKind.GREATER_EQUAL, ">=", None, start_line, start_column)
+                else:
+                    yield Token(TokenKind.GREATER, ">", None, start_line, start_column)
+                continue
+                
+            if char == '!':
+                if self._peek() == '=':
+                    self._advance()
+                    yield Token(TokenKind.NOT_EQUAL, "!=", None, start_line, start_column)
+                else:
+                    yield Token(TokenKind.LOGICAL_NOT, "!", None, start_line, start_column)
+                continue
+
+            if char == '&':
+                if self._peek() == '&':
+                    self._advance()
+                    yield Token(TokenKind.LOGICAL_AND, "&&", None, start_line, start_column)
+                    continue
+                raise LexerError("Esperado '&' após '&'", start_line, start_column)
+
+            if char == '|':
+                if self._peek() == '|':
+                    self._advance()
+                    yield Token(TokenKind.LOGICAL_OR, "||", None, start_line, start_column)
+                    continue
+                raise LexerError("Esperado '|' após '|'", start_line, start_column)
+
+            if char in single_chars:
+                yield Token(single_chars[char], char, None, start_line, start_column)
+                continue
+                
+            if char.isdigit():
+                lexeme = char
+                while not self._end() and self._peek().isdigit():
+                    lexeme += self._advance()
+                yield Token(TokenKind.INT_LITERAL, lexeme, int(lexeme), start_line, start_column)
+                continue
+                
+            if char.isalpha() or char == '_':
+                lexeme = char
+                while not self._end() and (self._peek().isalnum() or self._peek() == '_'):
+                    lexeme += self._advance()
+                
+                if lexeme in keywords:
+                    kind = keywords[lexeme]
+
+                    val = True if kind == TokenKind.KW_TRUE else (False if kind == TokenKind.KW_FALSE else None)
+                    yield Token(kind, lexeme, val, start_line, start_column)
+                else:
+                    yield Token(TokenKind.IDENTIFIER, lexeme, None, start_line, start_column)
+                continue
+
+            if char == '"':
+                lexeme = '"'
+                string_value = ""
+                while not self._end() and self._peek() != '"':
+                    c = self._advance()
+                    lexeme += c
+                    string_value += c
+                    
+                if self._end():
+                    raise LexerError("String não finalizada antes do fim do arquivo", start_line, start_column)
+                    
+                lexeme += self._advance() 
+                yield Token(TokenKind.STRING_LITERAL, lexeme, string_value, start_line, start_column)
+                continue
+                
+
+            raise LexerError(f"Caractere inesperado: {char!r}", start_line, start_column)
 
     def scan(self) -> list[Token]:
         return list(self.tokens())
-
