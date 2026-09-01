@@ -137,6 +137,15 @@ class Lexer:
                 continue
             break
 
+    def _is_digit(self, char: str) -> bool:
+        return '0' <= char <= '9'
+    
+    def _is_alpha(self, char: str) -> bool:
+        return ('a' <= char <= 'z') or ('A' <= char <= 'Z') or (char == '_')
+    
+    def _is_alnum(self, char: str) -> bool:
+        return self._is_alpha(char) or self._is_digit(char)
+
     def tokens(self) -> Iterator[Token]:
         """Produza todos os tokens significativos e um único EOF ao final."""
         # Dicionário para facilitar a identificação de palavras-chave
@@ -156,7 +165,7 @@ class Lexer:
         }
 
         while True:
-            self._skip_space()
+            self._skip_space()      # Pula espaços, tabs, quebras de linha e comentários
             
             start_line = self.line
             start_column = self.column
@@ -218,16 +227,19 @@ class Lexer:
                 yield Token(single_chars[char], char, None, start_line, start_column)
                 continue
                 
-            if char.isdigit():
+            if self._is_digit(char):
                 lexeme = char
-                while not self._end() and self._peek().isdigit():
+
+                while not self._end() and self._is_digit(self._peek()):
                     lexeme += self._advance()
+                    
                 yield Token(TokenKind.INT_LITERAL, lexeme, int(lexeme), start_line, start_column)
                 continue
                 
-            if char.isalpha() or char == '_':
+            if self._is_alpha(char):
                 lexeme = char
-                while not self._end() and (self._peek().isalnum() or self._peek() == '_'):
+
+                while not self._end() and self._is_alnum(self._peek()):
                     lexeme += self._advance()
                 
                 if lexeme in keywords:
@@ -236,7 +248,7 @@ class Lexer:
                     val = True if kind == TokenKind.KW_TRUE else (False if kind == TokenKind.KW_FALSE else None)
                     yield Token(kind, lexeme, val, start_line, start_column)
                 else:
-                    yield Token(TokenKind.IDENTIFIER, lexeme, None, start_line, start_column)
+                    yield Token(TokenKind.IDENTIFIER, lexeme, lexeme, start_line, start_column)
                 continue
 
             if char == '"':
