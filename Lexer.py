@@ -164,6 +164,10 @@ class Lexer:
             ',': TokenKind.COMMA, ';': TokenKind.SEMICOLON
         }
 
+        escapes = {
+            'n': '\n', 't': '\t', '"': '"', '\\': '\\'
+        }
+
         while True:
             self._skip_space()      # Pula espaços, tabs, quebras de linha e comentários
             
@@ -254,15 +258,34 @@ class Lexer:
             if char == '"':
                 lexeme = '"'
                 string_value = ""
-                while not self._end() and self._peek() != '"':
-                    c = self._advance()
-                    lexeme += c
-                    string_value += c
-                    
-                if self._end():
-                    raise LexerError("String não finalizada antes do fim do arquivo", start_line, start_column)
-                    
-                lexeme += self._advance() 
+                
+                while True:
+                    if self._end():
+                        raise LexerError("String não terminada", start_line, start_column)
+                    if self._peek() == '\n':
+                        raise LexerError("Quebra de linha não permitida em string", self.line, self.column)
+                    if self._peek() == '"':
+                        break
+                    if self._peek() == '\\':
+                        esc_line, esc_column = self.line, self.column
+                        self._advance()
+                        lexeme += '\\'
+                        
+                        if self._end():
+                            raise LexerError("String não terminada", start_line, start_column)
+                        
+                        escape_char = self._advance()
+                        lexeme += escape_char
+
+                        if escape_char not in escapes:
+                            raise LexerError(f"Escape inválido: \\{escape_char}", esc_line, esc_column)
+                        string_value += escapes[escape_char]
+                    else:
+                        char = self._advance()
+                        lexeme += char
+                        string_value += char
+
+                lexeme += self._advance()
                 yield Token(TokenKind.STRING_LITERAL, lexeme, string_value, start_line, start_column)
                 continue
                 
